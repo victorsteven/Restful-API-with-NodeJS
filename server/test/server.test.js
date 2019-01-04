@@ -18,7 +18,9 @@ const todos = [
     },
     {
         _id: new ObjectID(),
-        text: 'this is second'
+        text: 'this is second',
+        completed: true,
+        completedAt: 124
     },
 ];
 //lets make sure our database is empty, before we run each test:
@@ -100,6 +102,7 @@ describe('GET /todos/:id', () => {
                 expect(res.status).equal(200);
                 expect(res.body.todo.text).equal(todos[1].text);
                 Todo.findById(id).then(oneTodo => {
+                    // console.log('ONE TODO: ', oneTodo);
                     expect(oneTodo._id).deep.equal(id); //note id is an object, so we use deep equal
                     expect(oneTodo.text).equal('this is second');
                     done();
@@ -130,3 +133,102 @@ describe('GET /todos/:id', () => {
     })
 });
 
+describe("Delete todos", () => {
+    it('should delete a todo', done => {
+        var id = todos[0]._id.toHexString();
+        chai.request(app)
+            .delete(`/todos/${id}`)
+            .end((err, res) => {
+                if(err){
+                    return done(err);
+                }
+                expect(res.status).equal(200);
+                expect(res.body.todo.text).equal(todos[0].text);
+                expect(res.body.todo._id).equal(id);
+
+                //now, we have deleted the todo, so, when we find it in the database, it should not be there:
+                Todo.findById(id).then(todo => {
+                    expect(todo).to.not.exist;
+                    done();
+                }).catch(e => done(e))
+            })
+    });
+
+    it('should return 404 if todo not found', done => {
+        var id = new ObjectID();
+        chai.request(app)
+            .delete(`/todos/${id}`)
+            .end((err, res) => {
+                if(err){
+                    return done(err)
+                }
+                expect(res.status).equal(404);
+                done();
+            })
+    });
+
+    it('should return 400 if object id is invalid', done => {
+        chai.request(app)
+            .delete(`/todos/123`)
+            .end((err, res) => {
+                if(err){
+                    return done(err);
+                }
+                expect(res.status).equal(400);
+
+                done();
+            });
+    });
+});
+
+describe('UPDATE todos', () => {
+    it('should update a todo when completed is false', done => {
+        var id = todos[1]._id.toHexString();
+        var body = {text: 'this is mine', completed: false};
+
+        chai.request(app)
+            .patch(`/todos/${id}`)
+            .send(body)
+            .end((err, res) => {
+                if(err){
+                    return done(err)
+                }
+                expect(res.status).equal(200);
+                // console.log(res.body.todo);
+                expect(res.body.todo.text).equal('this is mine')
+                Todo.findById(id).then(todo => {
+                    // console.log(todo)
+                    expect(todo.text).equal('this is mine');
+                    expect(todo.completed).equal(false);
+                    expect(todo.completedAt).is.null
+                done();
+                }).catch(e => console.log('we didnt find it. Period!'));
+            });
+    });
+
+    it('should update todo when completed is true', done => {
+        var id = todos[0]._id.toHexString();
+        // var body = { text: "this is you", completed: true }
+        chai.request(app)
+            .patch(`/todos/${id}`)
+            // .send(body)
+            .send({
+                text: "this is for you", 
+                completed: true
+            })
+            .end((err, res) => {
+                if(err){
+                    return done(err)
+                }
+                expect(res.status).equal(200);
+
+                Todo.findById(id).then(todo => {
+                    // console.log(todo);
+                    expect(todo.text).equal('this is for you');
+                    expect(todo.completed).equal(true)
+                    expect(todo.completedAt).to.be.a('number')
+                    done();
+                }).catch(e => console.log('could not find todo'));
+            });
+    });
+});
